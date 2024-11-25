@@ -1,3 +1,7 @@
+###### IMPORT
+
+
+import sys
 import os
 import re
 import gensim.downloader as api
@@ -11,11 +15,26 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 
+
+###### PREPROCESS PART 0
+
+
+os.makedirs("tmp/", exist_ok = True)
+
+
 # Download some NLP models for processing, optional
 nltk.download('stopwords')
 nltk.download('wordnet')
+
 # Load GloVe model with Gensim's API
 embeddings_model = api.load("glove-twitter-200")  # 200-dimensional GloVe embeddings
+
+
+print("PREPROCESS PART 0 : OK")
+sys.stdout.flush()
+
+
+###### PREPROCESS PART 1
 
 
 # Function to compute the average word vector for a tweet
@@ -46,19 +65,28 @@ def preprocess_text(text):
     return ' '.join(words)
 
 
-# Read all training files and concatenate them into one dataframe
-li = []
-for filename in os.listdir("train_tweets"):
-    df = pd.read_csv("train_tweets/" + filename)
-    li.append(df)
-df = pd.concat(li, ignore_index=True)
+if not os.path.isfile("tmp/processing1.csv"):
+    # Read all training files and concatenate them into one dataframe
+    li = []
+    for filename in os.listdir("train_tweets"):
+        df = pd.read_csv("train_tweets/" + filename)
+        li.append(df)
+    df = pd.concat(li, ignore_index=True)
 
-print("Before applying preprocess")
+    # Apply preprocessing to each tweet
+    df['Tweet'] = df['Tweet'].apply(preprocess_text)
 
-# Apply preprocessing to each tweet
-df['Tweet'] = df['Tweet'].apply(preprocess_text)
+    df.to_csv("tmp/processing1.csv", index=False, encoding="utf-8")
+else:
+    df = pd.read_csv("tmp/processing1.csv")
 
-print("After applying preprocess")
+
+print("PREPROCESS PART 1 : OK")
+sys.stdout.flush()
+
+
+###### PREPROCESS PART 2
+
 
 # Apply preprocessing to each tweet and obtain vectors
 vector_size = 200  # Adjust based on the chosen GloVe model
@@ -88,7 +116,13 @@ clf = LogisticRegression(random_state=42, max_iter=1000).fit(X_train, y_train)
 y_pred = clf.predict(X_test)
 print("Test set: ", accuracy_score(y_test, y_pred))
 
+
+print("PREPROCESS PART 2 : OK")
+sys.stdout.flush()
+
+
 ###### For Kaggle submission
+
 
 # This time we train our classifier on the full dataset that it is available to us.
 clf = LogisticRegression(random_state=42, max_iter=1000).fit(X, y)
@@ -126,3 +160,7 @@ pred_df.to_csv('logistic_predictions.csv', index=False)
 
 pred_df = pd.concat(dummy_predictions)
 pred_df.to_csv('dummy_predictions.csv', index=False)
+
+
+print("KAGGLE : OK")
+sys.stdout.flush()
