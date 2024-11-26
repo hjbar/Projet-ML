@@ -19,6 +19,10 @@ from sklearn.model_selection import train_test_split
 ###### PREPROCESS PART 0
 
 
+print("PREPROCESS PART 0...")
+sys.stdout.flush()
+
+
 os.makedirs("tmp/", exist_ok = True)
 
 
@@ -35,6 +39,10 @@ sys.stdout.flush()
 
 
 ###### PREPROCESS PART 1
+
+
+print("PREPROCESS PART 1...")
+sys.stdout.flush()
 
 
 # Function to compute the average word vector for a tweet
@@ -88,6 +96,10 @@ sys.stdout.flush()
 ###### PREPROCESS PART 2
 
 
+print("PREPROCESS PART 2...")
+sys.stdout.flush()
+
+
 if not os.path.isfile("tmp/X.npy") and not os.path.isfile("tmp/y.npy"):
     # Apply preprocessing to each tweet and obtain vectors
     vector_size = 200  # Adjust based on the chosen GloVe model
@@ -129,6 +141,10 @@ sys.stdout.flush()
 
 
 ###### For Kaggle submission
+
+
+print("KAGGLE...")
+sys.stdout.flush()
 
 
 # This time we train our classifier on the full dataset that it is available to us.
