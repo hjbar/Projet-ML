@@ -88,33 +88,40 @@ sys.stdout.flush()
 ###### PREPROCESS PART 2
 
 
-# Apply preprocessing to each tweet and obtain vectors
-vector_size = 200  # Adjust based on the chosen GloVe model
-tweet_vectors = np.vstack([get_avg_embedding(tweet, embeddings_model, vector_size) for tweet in df['Tweet']])
-tweet_df = pd.DataFrame(tweet_vectors)
+if not os.path.isfile("tmp/X.npy") and not os.path.isfile("tmp/y.npy"):
+    # Apply preprocessing to each tweet and obtain vectors
+    vector_size = 200  # Adjust based on the chosen GloVe model
+    tweet_vectors = np.vstack([get_avg_embedding(tweet, embeddings_model, vector_size) for tweet in df['Tweet']])
+    tweet_df = pd.DataFrame(tweet_vectors)
 
-# Attach the vectors into the original dataframe
-period_features = pd.concat([df, tweet_df], axis=1)
-# Drop the columns that are not useful anymore
-period_features = period_features.drop(columns=['Timestamp', 'Tweet'])
-# Group the tweets into their corresponding periods. This way we generate an average embedding vector for each period
-period_features = period_features.groupby(['MatchID', 'PeriodID', 'ID']).mean().reset_index()
+    # Attach the vectors into the original dataframe
+    period_features = pd.concat([df, tweet_df], axis=1)
+    # Drop the columns that are not useful anymore
+    period_features = period_features.drop(columns=['Timestamp', 'Tweet'])
+    # Group the tweets into their corresponding periods. This way we generate an average embedding vector for each period
+    period_features = period_features.groupby(['MatchID', 'PeriodID', 'ID']).mean().reset_index()
 
-# We drop the non-numerical features and keep the embeddings values for each period
-X = period_features.drop(columns=['EventType', 'MatchID', 'PeriodID', 'ID']).values
-# We extract the labels of our training samples
-y = period_features['EventType'].values
+    # We drop the non-numerical features and keep the embeddings values for each period
+    X = period_features.drop(columns=['EventType', 'MatchID', 'PeriodID', 'ID']).values
+    # We extract the labels of our training samples
+    y = period_features['EventType'].values
 
-###### Evaluating on a test set:
+    ###### Evaluating on a test set:
 
-# We split our data into a training and test set that we can use to train our classifier without fine-tuning into the
-# validation set and without submitting too many times into Kaggle
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+    # We split our data into a training and test set that we can use to train our classifier without fine-tuning into the
+    # validation set and without submitting too many times into Kaggle
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
-# We set up a basic classifier that we train and then calculate the accuracy on our test set
-clf = LogisticRegression(random_state=42, max_iter=1000).fit(X_train, y_train)
-y_pred = clf.predict(X_test)
-print("Test set: ", accuracy_score(y_test, y_pred))
+    # We set up a basic classifier that we train and then calculate the accuracy on our test set
+    clf = LogisticRegression(random_state=42, max_iter=1000).fit(X_train, y_train)
+    y_pred = clf.predict(X_test)
+    print("Test set: ", accuracy_score(y_test, y_pred))
+
+    np.save("tmp/X.npy", X)
+    np.save("tmp/y.npy", y)
+else:
+    X = np.load("tmp/X.npy")
+    y = np.load("tmp/y.npy")
 
 
 print("PREPROCESS PART 2 : OK")
