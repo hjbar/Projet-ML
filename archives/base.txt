@@ -1,3 +1,7 @@
+Avec preprocess de base
+
+-- -- -- -- --
+
 LogisticRegression(random_state=42, max_iter=1000) ==> 0.73209 ==> 0.64843
 
 --

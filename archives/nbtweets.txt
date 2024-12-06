@@ -1,0 +1,7 @@
+Avec preprocess de base + nombre de tweets par minute
+
+-- -- -- -- --
+
+XGBClassifier(random_state=42, n_estimators=170, learning_rate=0.1, max_depth=6, subsample=1, eval_metric="logloss", booster="gbtree") ==> 0.79595 ==> ?
+XGBClassifier(random_state=42, n_estimators=195, learning_rate=0.2, max_depth=3, subsample=1) ==> 0.81308 ==> 0.57031
+XGBClassifier(random_state=42, n_estimators=140, learning_rate=0.2, max_depth=3, subsample=1) ==> 0.80062 ==> ?
