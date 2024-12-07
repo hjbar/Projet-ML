@@ -1,0 +1,6 @@
+Uniquement : nombre de tweets par minute + mots de football + émotions
+
+-- -- -- -- --
+
+RandomForestClassifier(random_state=42, n_estimators=205, max_depth=7, max_features='sqrt') ==> 0.71651 ==> 0.64843
+XGBClassifier(random_state=42, n_estimators=80, learning_rate=0.05, max_depth=4, subsample=1) ==> 0.69159 ==> ?
