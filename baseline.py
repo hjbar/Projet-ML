@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from textblob import TextBlob
+from symspellpy import SymSpell, Verbosity
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 from sklearn.dummy import DummyClassifier
@@ -36,6 +37,17 @@ def get_avg_embedding(tweet, model, vector_size=200):
     return np.mean(word_vectors, axis=0)
 
 
+sym_spell = SymSpell(max_dictionary_edit_distance=2, prefix_length=7)
+sym_spell.load_dictionary("en-80k.txt", term_index=0, count_index=1)
+# Correct word
+def correct_text(text):
+    sug = sym_spell.lookup(text, Verbosity.CLOSEST, max_edit_distance=2)
+    if sug:
+        return sug[0].term
+    else:
+        return text
+
+
 # Basic preprocessing function
 def preprocess_text(text):
     # Lowercasing
@@ -44,13 +56,11 @@ def preprocess_text(text):
     text = re.sub(r'[^\w\s]', '', text)
     # Remove numbers
     text = re.sub(r'\d+', '', text)
-    # Corrige les fautes
-    text = str(TextBlob(text).correct())
     # Tokenization
     words = text.split()
     # Remove stopwords
     stop_words = set(stopwords.words('english'))
-    words = [word for word in words if word not in stop_words]
+    words = [correct_text(word) for word in words if word not in stop_words]
     # Lemmatization
     lemmatizer = WordNetLemmatizer()
     words = [lemmatizer.lemmatize(word) for word in words]
@@ -152,7 +162,7 @@ if go or not os.path.isfile("tmp/X.npy") and not os.path.isfile("tmp/y.npy"):
     ##
 
     # Ajouter une colonne contenant le nombre de tweets par PeriodID
-    period_features['TweetCount'] = period_features.groupby('PeriodID')['Tweet'].transform('size').fillna(0)
+    period_features['TweetCount'] = period_features.groupby(['MatchID', 'PeriodID', 'ID'])['Tweet'].transform('size').fillna(0)
     period_features['TweetCount'] = period_features['TweetCount'] / period_features['TweetCount'].max()
 
     # Ajouter une colonne contenant le nombre de mots liés au foot par tweet
@@ -220,7 +230,7 @@ sys.stdout.flush()
 
 # This time we train our classifier on the full dataset that it is available to us.
 
-clf = XGBClassifier(random_state=42, n_estimators=80, learning_rate=0.05, max_depth=4, subsample=1)
+clf = XGBClassifier(random_state=42, n_estimators=170, learning_rate=0.1, max_depth=6, subsample=1, eval_metric="logloss", booster="gbtree")
 clf.fit(X, y)
 predictions = []
 
