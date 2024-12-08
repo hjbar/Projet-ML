@@ -113,7 +113,7 @@ print("PREPROCESS PART 1...")
 sys.stdout.flush()
 
 
-go = True
+go = False
 
 
 if go or not os.path.isfile("tmp/processing1.csv"):
@@ -146,16 +146,16 @@ sys.stdout.flush()
 
 
 vector_size = 200  # Adjust based on the chosen GloVe model
-go = True
+go = False
 
 
 if go or not os.path.isfile("tmp/X.npy") and not os.path.isfile("tmp/y.npy"):
     # Apply preprocessing to each tweet and obtain vectors
-    # tweet_vectors = np.vstack([get_avg_embedding(tweet, embeddings_model, vector_size) for tweet in df['Tweet']])
-    # tweet_df = pd.DataFrame(tweet_vectors)
+    tweet_vectors = np.vstack([get_avg_embedding(tweet, embeddings_model, vector_size) for tweet in df['Tweet']])
+    tweet_df = pd.DataFrame(tweet_vectors)
 
     # Attach the vectors into the original dataframe
-    # period_features = pd.concat([df, tweet_df], axis=1)
+    period_features = pd.concat([df, tweet_df], axis=1)
     period_features = df
 
     ##
@@ -242,14 +242,14 @@ for fname in os.listdir("eval_tweets"):
     val_df = pd.read_csv("eval_tweets/" + fname)
     val_df['Tweet'] = val_df['Tweet'].apply(preprocess_text)
 
-    # tweet_vectors = np.vstack([get_avg_embedding(tweet, embeddings_model, vector_size) for tweet in val_df['Tweet']])
-    # tweet_df = pd.DataFrame(tweet_vectors)
+    tweet_vectors = np.vstack([get_avg_embedding(tweet, embeddings_model, vector_size) for tweet in val_df['Tweet']])
+    tweet_df = pd.DataFrame(tweet_vectors)
 
-    # period_features = pd.concat([val_df, tweet_df], axis=1)
+    period_features = pd.concat([val_df, tweet_df], axis=1)
     period_features = val_df
 
     ###
-    period_features['TweetCount'] = period_features.groupby('PeriodID')['Tweet'].transform('size').fillna(0)
+    period_features['TweetCount'] = period_features.groupby(['MatchID', 'PeriodID', 'ID'])['Tweet'].transform('size').fillna(0)
     period_features['TweetCount'] = period_features['TweetCount'] / period_features['TweetCount'].max()
 
     period_features['FootballWordCount'] = period_features['Tweet'].apply(count_football_words).fillna(0)
