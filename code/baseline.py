@@ -252,8 +252,8 @@ if go_kaggle or not os.path.isfile("predictions.csv"):
     lr = LogisticRegression(random_state=42, max_iter=1000)
     base_models = [ ('rf', rf), ('xgb', xgb), ('lr', lr) ]
     meta_model = LogisticRegression()
-
-    clf = StackingClassifier(estimators=base_models, final_estimator=meta_model, cv=3)
+    clf_aux = StackingClassifier(estimators=base_models, final_estimator=meta_model, cv=3)
+    clf = BaggingClassifier(clf_aux, n_estimators=10, bootstrap=True, random_state=42)
     clf.fit(X, y)
     predictions = []
 
