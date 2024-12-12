@@ -3,6 +3,8 @@ eval_tweets/
 train_tweets/
 tmp/
 tmp*
+*.csv
+*.npy
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
