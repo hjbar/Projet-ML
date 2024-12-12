@@ -6,17 +6,16 @@ import nltk
 import numpy as np
 import pandas as pd
 import random as rd
-from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from symspellpy import SymSpell, Verbosity
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 from sklearn.ensemble import StackingClassifier
+from sklearn.ensemble import BaggingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
 from sklearn.metrics import accuracy_score
 from xgboost import XGBClassifier
-from sklearn.ensemble import BaggingClassifier
 
 #####
 #####
@@ -85,24 +84,6 @@ def split_custom(X, y, test_size=0.3, random_state=42):
                 y_test.append(y[index])
             index+=1
     return np.array(X_train), np.array(X_test), np.array(y_train), np.array(y_test)
-
-
-analyzer = SentimentIntensityAnalyzer()
-# Calculate sentiment rate of a text
-def get_sentiment_rate(text):
-    scores = analyzer.polarity_scores(text)
-    return np.abs(scores['compound'])
-
-def difference(U):
-    U_before = np.zeros(U.shape)
-    U_before[1:] = U[1:]-U[:-1]
-    U_after = np.zeros(U.shape)
-    U_after[:-1] = U[:-1]-U[1:]
-    U_before2 = np.zeros(U.shape)
-    U_before2[2:] = U[2:]-U[:-2]
-    U_before3 = np.zeros(U.shape)
-    U_before3[3:] = U[3:]-U[:-3]
-    return U_before, U_after, U_before2, U_before3
 
 #####
 #####
@@ -174,7 +155,7 @@ vector_size = 200  # Adjust based on the chosen GloVe model
 
 
 if go or not os.path.isfile("tmp/X.npy") or not os.path.isfile("tmp/y.npy"):
-
+    
     if go or not os.path.isfile("tmp/tweet_df.npy"):
         # Calcul la 1ère partie de l'embeddings
         tweet_vectors = np.vstack([get_avg_embedding(tweet, embeddings_model, vector_size) for tweet in df['Tweet']])
@@ -186,37 +167,25 @@ if go or not os.path.isfile("tmp/X.npy") or not os.path.isfile("tmp/y.npy"):
 
     print("tweet_df : OK")
     sys.stdout.flush()
-
+    
     # Join les df
     period_features = pd.concat([df, tweet_df], axis=1)
 
     print("period_features : OK")
     sys.stdout.flush()
 
-    #
-    period_features['TweetNb'] = period_features.groupby(['MatchID', 'PeriodID', 'ID'])['Tweet'].transform('size')
-
-    U_before, U_after,U_before2,U_before3 = difference(period_features['TweetNb'].values)
-    period_features['TweetNb_before2'] = U_before2
-    period_features['TweetNb_before2'] = period_features['TweetNb_before2'] / period_features['TweetNb_before2'].apply(np.abs).max()
-
-    period_features['Sentiment'] = period_features['Tweet'].apply(get_sentiment_rate)
-    period_features['Std_sentiment'] = period_features.groupby(['MatchID', 'PeriodID', 'ID'])['Sentiment'].transform('std')
-
-    period_features = period_features.drop(columns=['TweetNb', 'Sentiment'])
-    #
-
+    
     # Drop the columns that are not useful anymore
     period_features = period_features.drop(columns=['Timestamp', 'Tweet'])
-
+    
     # Group the tweets into their corresponding periods. This way we generate an average embedding vector for each period
     period_features = period_features.groupby(['MatchID', 'PeriodID', 'ID']).mean().reset_index()
-
+    
     # We drop the non-numerical features and keep the embeddings values for each period
     X = period_features.drop(columns=['EventType', 'MatchID', 'PeriodID', 'ID']).values
     # We extract the labels of our training samples
     y = period_features['EventType'].values
-
+    
     np.save("tmp/X.npy", X)
     np.save("tmp/y.npy", y)
 
@@ -225,12 +194,147 @@ if go or not os.path.isfile("tmp/X.npy") or not os.path.isfile("tmp/y.npy"):
 else:
     X = np.load("tmp/X.npy")
     y = np.load("tmp/y.npy")
-
+    
 
 
 print("PREPROCESS PART 2 : OK")
 sys.stdout.flush()
 
+#####
+#####
+#####
+#####
+
+# TESTING :
+
+# We split our data into a training and test set that we can use to train our classifier without fine-tuning into the
+# validation set and without submitting too many times into Kaggle
+
+X_train, X_test, y_train, y_test = split_custom(X, y, test_size=0.3, random_state=42)
+
+# SOLO :
+
+clf =  LogisticRegression(random_state=42, max_iter=1000)
+clf.fit(X_train, y_train)
+y_pred = clf.predict(X_test)
+print("LR-1000 : ", accuracy_score(y_test, y_pred))
+
+
+clf = RandomForestClassifier(random_state=42, n_estimators=100)
+clf.fit(X_train, y_train)
+y_pred = clf.predict(X_test)
+print("RF-100 : ", accuracy_score(y_test, y_pred))
+
+
+clf = RandomForestClassifier(random_state=42, n_estimators=170, max_depth=10, max_features="sqrt")
+clf.fit(X_train, y_train)
+y_pred = clf.predict(X_test)
+print("RF-170 (10, sqrt) : ", accuracy_score(y_test, y_pred))
+
+
+clf = XGBClassifier(random_state=42, n_estimators=100)
+clf.fit(X_train, y_train)
+y_pred = clf.predict(X_test)
+print("XGB-100 : ", accuracy_score(y_test, y_pred))
+
+
+clf = XGBClassifier(random_state=42, n_estimators=170, learning_rate=0.1, max_depth=6, subsample=1, eval_metric="logloss", booster="gbtree")
+clf.fit(X_train, y_train)
+y_pred = clf.predict(X_test)
+print("XGB-170 (0.1, 6, 1, logloss, gbtree) : ", accuracy_score(y_test, y_pred))
+
+# MULTI :
+
+rf = RandomForestClassifier(random_state=42, n_estimators=100)
+xgb = XGBClassifier(random_state=42, n_estimators=100)
+lr = LogisticRegression(random_state=42, max_iter=1000)
+svc =  SVC(kernel="rbf", random_state=42)
+base_models = [ ('rf', rf), ('xgb', xgb), ('lr', lr), ('svc', svc) ]
+meta_model = LogisticRegression()
+clf = StackingClassifier(estimators=base_models, final_estimator=meta_model, cv=3)
+clf.fit(X_train, y_train)
+y_pred = clf.predict(X_test)
+print("STACK-BASIC (rf, xgb, lr, svc) : ", accuracy_score(y_test, y_pred))
+
+rf = RandomForestClassifier(random_state=42, n_estimators=100)
+xgb = XGBClassifier(random_state=42, n_estimators=100)
+lr = LogisticRegression(random_state=42, max_iter=1000)
+base_models = [ ('rf', rf), ('xgb', xgb), ('lr', lr) ]
+meta_model = LogisticRegression()
+clf = StackingClassifier(estimators=base_models, final_estimator=meta_model, cv=3)
+clf.fit(X_train, y_train)
+y_pred = clf.predict(X_test)
+print("STACK-BASIC (rf, xgb, lr) : ", accuracy_score(y_test, y_pred))
+
+
+rf = RandomForestClassifier(random_state=42, n_estimators=100)
+xgb = XGBClassifier(random_state=42, n_estimators=100)
+base_models = [ ('rf', rf), ('xgb', xgb) ]
+meta_model = LogisticRegression()
+clf = StackingClassifier(estimators=base_models, final_estimator=meta_model, cv=3)
+clf.fit(X_train, y_train)
+y_pred = clf.predict(X_test)
+print("STACK-BASIC (rf, xgb) : ", accuracy_score(y_test, y_pred))
+
+
+rf = RandomForestClassifier(random_state=42, n_estimators=170, max_depth=10, max_features="sqrt")
+xgb = XGBClassifier(random_state=42, n_estimators=170, learning_rate=0.1, max_depth=6, subsample=1, eval_metric="logloss", booster="gbtree")
+lr = LogisticRegression(random_state=42, max_iter=1000)
+svc =  SVC(kernel="rbf", random_state=42)
+base_models = [ ('rf', rf), ('xgb', xgb), ('lr', lr), ('svc', svc) ]
+meta_model = LogisticRegression()
+clf = StackingClassifier(estimators=base_models, final_estimator=meta_model, cv=3)
+clf.fit(X_train, y_train)
+y_pred = clf.predict(X_test)
+print("STACK-ADVANCED (rf, xgb, lr, svc) : ", accuracy_score(y_test, y_pred))
+
+rf = RandomForestClassifier(random_state=42, n_estimators=170, max_depth=10, max_features="sqrt")
+xgb = XGBClassifier(random_state=42, n_estimators=170, learning_rate=0.1, max_depth=6, subsample=1, eval_metric="logloss", booster="gbtree")
+lr = LogisticRegression(random_state=42, max_iter=1000)
+base_models = [ ('rf', rf), ('xgb', xgb), ('lr', lr) ]
+meta_model = LogisticRegression()
+clf = StackingClassifier(estimators=base_models, final_estimator=meta_model, cv=3)
+clf.fit(X_train, y_train)
+y_pred = clf.predict(X_test)
+print("STACK-ADVANCED (rf, xgb, lr) : ", accuracy_score(y_test, y_pred))
+
+
+rf = RandomForestClassifier(random_state=42, n_estimators=170, max_depth=10, max_features="sqrt")
+xgb = XGBClassifier(random_state=42, n_estimators=170, learning_rate=0.1, max_depth=6, subsample=1, eval_metric="logloss", booster="gbtree")
+base_models = [ ('rf', rf), ('xgb', xgb) ]
+meta_model = LogisticRegression()
+clf = StackingClassifier(estimators=base_models, final_estimator=meta_model, cv=3)
+clf = StackingClassifier(estimators=base_models, final_estimator=meta_model, cv=3)
+clf.fit(X_train, y_train)
+y_pred = clf.predict(X_test)
+print("STACK-ADVANCED (rf, xgb) : ", accuracy_score(y_test, y_pred))
+
+# BOOTSTRAP :
+
+clf_aux = RandomForestClassifier(random_state=42, n_estimators=100)
+clf = BaggingClassifier(clf_aux, n_estimators=10, bootstrap=True, random_state=42)
+clf.fit(X_train, y_train)
+y_pred = clf.predict(X_test)
+print("BOOTSTRAP-RF-100 : ", accuracy_score(y_test, y_pred))
+
+
+clf_aux = RandomForestClassifier(random_state=42, n_estimators=170, max_depth=10, max_features="sqrt")
+clf = BaggingClassifier(clf_aux, n_estimators=10, bootstrap=True, random_state=42)
+clf.fit(X_train, y_train)
+y_pred = clf.predict(X_test)
+print("BOOTSTRAP-RF-170 (10, sqrt) : ", accuracy_score(y_test, y_pred))
+
+clf_aux = XGBClassifier(random_state=42, n_estimators=100)
+clf = BaggingClassifier(clf_aux, n_estimators=10, bootstrap=True, random_state=42)
+clf.fit(X_train, y_train)
+y_pred = clf.predict(X_test)
+print("BOOTSTRAP-XGB-100 : ", accuracy_score(y_test, y_pred))
+
+clf_aux = XGBClassifier(random_state=42, n_estimators=170, learning_rate=0.1, max_depth=6, subsample=1, eval_metric="logloss", booster="gbtree")
+clf = BaggingClassifier(clf_aux, n_estimators=10, bootstrap=True, random_state=42)
+clf.fit(X_train, y_train)
+y_pred = clf.predict(X_test)
+print("BOOTSTRAP-XGB-170 (0.1, 6, 1, logloss, gbtree) : ", accuracy_score(y_test, y_pred))
 
 #####
 #####
@@ -246,13 +350,13 @@ go_kaggle = False
 
 if go_kaggle or not os.path.isfile("predictions.csv"):
     # This time we train our classifier on the full dataset that it is available to us.
-
+    
     rf = RandomForestClassifier(random_state=42, n_estimators=170, max_depth=10, max_features="sqrt")
     xgb = XGBClassifier(random_state=42, n_estimators=170, learning_rate=0.1, max_depth=6, subsample=1, eval_metric="logloss", booster="gbtree")
     lr = LogisticRegression(random_state=42, max_iter=1000)
     base_models = [ ('rf', rf), ('xgb', xgb), ('lr', lr) ]
     meta_model = LogisticRegression()
-
+    
     clf = StackingClassifier(estimators=base_models, final_estimator=meta_model, cv=3)
     clf.fit(X, y)
     predictions = []
@@ -265,7 +369,7 @@ if go_kaggle or not os.path.isfile("predictions.csv"):
     # to be submitted on Kaggle.
     for fname in os.listdir("eval_tweets"):
         filename = "tmp_kaggle/preprocessing_" + fname + ".csv"
-
+        
         if go or not os.path.isfile(filename):
             val_df = pd.read_csv("eval_tweets/" + fname)
             val_df['Tweet'] = val_df['Tweet'].apply(preprocess_text)
@@ -285,19 +389,6 @@ if go_kaggle or not os.path.isfile("predictions.csv"):
             tweet_df = pd.DataFrame(tweet_df)
 
         period_features = pd.concat([val_df, tweet_df], axis=1)
-        ###
-
-        ###
-        period_features['TweetNb'] = period_features.groupby(['MatchID', 'PeriodID', 'ID'])['Tweet'].transform('size')
-
-        U_before, U_after,U_before2,U_before3 = difference(period_features['TweetNb'].values)
-        period_features['TweetNb_before2'] = U_before2
-        period_features['TweetNb_before2'] = period_features['TweetNb_before2'] / period_features['TweetNb_before2'].apply(np.abs).max()
-
-        period_features['Sentiment'] = period_features['Tweet'].apply(get_sentiment_rate)
-        period_features['Std_sentiment'] = period_features.groupby(['MatchID', 'PeriodID', 'ID'])['Sentiment'].transform('std')
-
-        period_features = period_features.drop(columns=['TweetNb', 'Sentiment'])
         ###
 
         period_features = period_features.drop(columns=['Timestamp', 'Tweet'])
