@@ -4,7 +4,7 @@
 
 ### Imports
 
-To execute our program, the following Python libraries must be available : ```sys```, ```os```, ```re```, ```gensim```, ```nltk```, ```numpy```, ```pandas```, ```random```, ```symspellpy```, ```scikit-learn``` and ```xgboost```.
+To execute our program, the following Python libraries must be available : ```sys```, ```os```, ```re```, ```gensim```, ```nltk```, ```numpy```, ```pandas```, ```random```, ```vaderSentiment```, ```symspellpy```, ```scikit-learn``` and ```xgboost```.
 
 ### Location and command
 
@@ -32,4 +32,4 @@ To avoid recalculating everything each time, our program saves variables in temp
 
 ### Others baselines
 
-In the ```old_codes``` directory, we have included other baselines where we tested different methods and techniques. To execute them, you will need to move them to the root of the ```code``` directory. Additionally, you will need to install some extra libraries, such as ```torch```, ```vaderSentiment```, ```transformers```, and ```tqdm```.
+In the ```old_codes``` directory, we have included other baselines where we tested different methods and techniques. To execute them, you will need to move them to the root of the ```code``` directory. Additionally, you will need to install some extra libraries, such as ```torch```, ```transformers```, and ```tqdm```.
